@@ -18,9 +18,9 @@ public class FloatDecoder {
 	 * @return true if value represents a positive floating point number, false otherwise
 	 */
 	public static boolean isPositive(int value) {
-		int normalizedValue = value & 0b10000000000000000000000000000000;
+		int maskedValue = value & 0b10000000000000000000000000000000;
 		
-		if (normalizedValue == 0b10000000000000000000000000000000) {
+		if (maskedValue == 0b10000000000000000000000000000000) {
 			return false;
 		}
 		return true;
@@ -33,8 +33,8 @@ public class FloatDecoder {
 	 * @return the properly-biased exponent
 	 */
 	public static int decodeExponent(int value) {
-		int normalizedValue = value & 0b01111111100000000000000000000000;
-		int shiftedValue = normalizedValue >>> 23;
+		int maskedValue = value & 0b01111111100000000000000000000000;
+		int shiftedValue = maskedValue >>> 23;
 		int unbiasedValue = shiftedValue - 127;
 		return unbiasedValue;
 	}
@@ -47,17 +47,36 @@ public class FloatDecoder {
 	 * the significant digits portion, i.e., it will be "x2^0"
 	 */
 	public static float decodeSignificantDigits(int value) {
-		throw new UnsupportedOperationException("not implemented");
+		int bitValue = value & 0b00000000011111111111111111111111;
+		bitValue = bitValue | 0b00000000100000000000000000000000;
+		
+		float result = 0;
+		
+		int bitIndex = 23;
+		for (int i = 0; i < 23; i++) {
+			if (bitValue >= Math.pow(2, bitIndex)) {
+				bitValue -= Math.pow(2, bitIndex);
+				result += 1 / Math.pow(2, i);
+			}
+			
+			bitIndex--;
+		}
+
+		return result;
 	}
 	
 	/**
 	 * Creates a float from the given 32-bit integer value.
 	 * 
 	 * @param value a 32-bit value
-	 * @return
+	 * @return the decoded float value
 	 */
 	public static float decodeAsFloat(int value) {
-		throw new UnsupportedOperationException("not implemented");
+		if (isPositive(value)) {
+			return decodeSignificantDigits(value) * (float) Math.pow(2, decodeExponent(value));
+		} else {
+			return -decodeSignificantDigits(value) * (float) Math.pow(2, decodeExponent(value));
+		}
 	}
 	
 	/**
@@ -81,6 +100,10 @@ public class FloatDecoder {
 	 * @return true if NaN, false otherwise
 	 */
 	public static boolean isNaN(int value) {
+		if (decodeExponent(value) == 128 && decodeSignificantDigits(value) != 1) {
+			return true;
+		}
+		
 		return false;
 	}
 	
